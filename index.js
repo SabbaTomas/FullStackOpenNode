@@ -19,6 +19,7 @@ app.use(morgan((tokens, req, res) => {
   ].join(' ');
 }));
 
+
 app.get('/', (request, response) => {
   response.send('<h1>Hello World!</h1>');
 });
@@ -28,6 +29,7 @@ app.get('/api/persons', (req, res, next) => {
     .then(persons => res.json(persons))
     .catch(next);
 });
+
 
 app.get('/api/info', (req, res, next) => {
   Person.countDocuments({})
@@ -46,15 +48,16 @@ app.get('/api/persons/:id', (req, res, next) => {
     .catch(next);
 });
 
-
 app.delete('/api/persons/:id', (req, res, next) => {
-  Person.findByIdAndRemove(req.params.id)
-    .then(() => res.status(204).end())
+  Person.findByIdAndDelete(req.params.id)
+    .then(() => {
+      res.status(204).end();
+    })
     .catch(next);
 });
 
 app.post('/api/persons', (req, res, next) => {
-  const body = req.body || {}; // evita TypeError si req.body es undefined
+  const body = req.body || {}; 
 
   if (!body.name) {
     return res.status(400).json({ error: 'name missing' });
@@ -73,6 +76,39 @@ app.post('/api/persons', (req, res, next) => {
     .catch(next);
 });
 
+
+app.put('/api/persons/:id', (req, res, next) => {
+  const { name, number } = req.body;
+  const update = { name, number };
+
+  Person.findByIdAndUpdate(req.params.id, update, {
+    new: true,
+    runValidators: true,
+    context: 'query'
+  })
+    .then(updatedPerson => {
+      if (updatedPerson) res.json(updatedPerson);
+      else res.status(404).end();
+    })
+    .catch(next);
+});
+
+const unknownEndpoint = (request, response) => {
+  response.status(404).send({ error: 'unknown endpoint' })
+}
+
+const errorHandler = (error, request, response, next) => {
+  console.error(error.message)
+
+  if (error.name === 'CastError') {
+    return response.status(400).send({ error: 'malformatted id' })
+  } 
+
+  next(error)
+}
+
+app.use(unknownEndpoint)
+app.use(errorHandler)
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
